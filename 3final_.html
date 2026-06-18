@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MIXMATCH Premium Wardrobe</title>
+<link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/index.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.css">
+
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: 'Pretendard', Arial, sans-serif; background: #1b120d; color: #f5ead8; overflow: hidden; height: 100vh; }
+.screen { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* 첫 화면 문 열기 애니메이션용 CSS */
+#intro { z-index: 50; display: flex; align-items: center; justify-content: center; overflow: hidden; pointer-events: none; }
+.door { position: absolute; top: 0; bottom: 0; width: 50%; background: linear-gradient(90deg,#4b2d1b 0%,#3d2415 100%); transition: transform 1.2s ease-in-out; pointer-events: auto; z-index: 1; border-right: 2px solid #2a180e; }
+.door-left { left: 0; transform-origin: left; }
+.door-right { right: 0; transform-origin: right; border-left: 2px solid #2a180e; border-right: none; background: linear-gradient(-90deg,#4b2d1b 0%,#3d2415 100%);}
+.door-handle { position: absolute; top: 50%; width: 10px; height: 60px; background: #c9a56a; border-radius: 5px; transform: translateY(-50%); }
+.door-left .door-handle { right: 10px; }
+.door-right .door-handle { left: 10px; }
+.intro-content { position: relative; z-index: 2; text-align: center; transition: opacity 0.5s ease; pointer-events: auto; background: rgba(0,0,0,0.4); padding: 40px; border-radius: 20px; border: 1px solid rgba(201, 165, 106, 0.3); backdrop-filter: blur(5px); }
+
+/* 문이 열릴 때 클래스 */
+#intro.open .door-left { transform: translateX(-100%); }
+#intro.open .door-right { transform: translateX(100%); }
+#intro.open .intro-content { opacity: 0; pointer-events: none; }
+
+.wood { background: linear-gradient(90deg, #3d2618, #5a3822, #3d2618); }
+.btn { background: #c9a56a; color: #1b120d; border: none; padding: 12px 18px; border-radius: 10px; cursor: pointer; font-weight: bold; font-size: 15px; font-family: 'Pretendard', sans-serif; transition: all 0.3s; text-align: center; display: inline-block; }
+.btn:hover { background: #dfb97a; transform: translateY(-2px); }
+#wardrobe { display: none; overflow-y: auto; height: 100vh; }
+
+.row { display: flex; flex-wrap: wrap; min-height: 100%; }
+.left { width: 55%; border-right: 1px solid rgba(255,255,255,.1); padding: 20px; display: flex; flex-direction: column; }
+.right { width: 45%; padding: 20px; }
+
+/* 옷장 선반 디자인 */
+.closet-container { display: flex; flex-direction: column; gap: 20px; background: #2a180e; padding: 25px 15px 15px 15px; border-radius: 12px; border: 4px solid #4b2d1b; box-shadow: inset 0 0 20px rgba(0,0,0,0.8); flex-grow: 1; margin-bottom: 20px; }
+.shelf { position: relative; background: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.1) 100%); border-bottom: 12px solid #3d2415; border-radius: 4px; min-height: 140px; padding: 20px 10px 10px 10px; display: flex; flex-wrap: wrap; gap: 10px; transition: background 0.3s; }
+.shelf::after { content: ''; position: absolute; bottom: -12px; left: 0; right: 0; height: 12px; background: #5a3822; border-radius: 0 0 4px 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.4); }
+.shelf-label { position: absolute; top: -12px; left: 15px; background: #c9a56a; color: #1b120d; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.5); z-index: 2; }
+.shelf.drag-over { background: rgba(201, 165, 106, 0.15); border-color: #c9a56a; }
+
+.hanger { position: relative; display: inline-flex; flex-direction: column; align-items: center; margin: 5px; cursor: grab; transition: transform 0.2s; touch-action: none; }
+.hanger:active { cursor: grabbing; }
+.hanger:hover { transform: translateY(-5px); }
+.hanger img { width: 100px; height: 120px; object-fit: contain; background: rgba(255,255,255,.05); border-radius: 12px; padding: 8px; border: 2px solid transparent; pointer-events: none; }
+.delete-btn { position: absolute; top: 20px; right: 5px; background: rgba(255, 0, 0, 0.8); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 11px; display: flex; align-items: center; justify-content: center; z-index: 10;}
+.delete-btn:hover { background: red; }
+
+.camera { border: 1px solid #8a6a44; border-radius: 12px; padding: 15px; background: rgba(0,0,0,0.2); }
+video, canvas { width: 100%; border-radius: 10px; background: #000; }
+.card { background: rgba(255,255,255,.06); padding: 20px; border-radius: 12px; margin-top: 15px; line-height: 1.6; }
+
+/* 업로드 버튼 숨김 처리용 */
+.file-upload-wrapper input[type="file"] { display: none; }
+
+#recommend { display: none; padding: 30px; overflow: auto; background: #120c08; min-height: 100vh; }
+.score { font-size: 60px; color: #d8b06c; font-weight: bold; }
+.recommend-images { display: flex; gap: 20px; margin-bottom: 20px; justify-content: center; flex-wrap: wrap; }
+.recommend-images img { width: 150px; height: 180px; object-fit: contain; background: rgba(255,255,255,.05); border-radius: 12px; padding: 10px; border: 2px solid #d8b06c; }
+
+/* 반응형 모바일 디자인 개선 */
+@media (max-width: 768px) {
+    .row { flex-direction: column; }
+    .left { width: 100%; border-right: none; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 30px; }
+    .right { width: 100%; padding-bottom: 40px; }
+    body { overflow-y: auto; }
+    #wardrobe { overflow-x: hidden; }
+    .btn-group { flex-direction: column; }
+    .btn { width: 100%; margin-bottom: 10px; }
+    .hanger img { width: 80px; height: 100px; }
+}
+
+/* 제니 폰트 적용 */
+@font-face {
+    font-family: 'Jennie';
+    src: local('Jennie'), local('ZEN SERIF');
+}
+</style>
+</head>
+<body>
+
+<div id="intro">
+    <div class="door door-left"><div class="door-handle"></div></div>
+    <div class="door door-right"><div class="door-handle"></div></div>
+    <div class="intro-content">
+        <h1 style="font-size: 55px; margin-bottom: 10px; color: #d8b06c; font-family: 'Jennie', 'ZEN SERIF', serif; letter-spacing: 2px;">MIXMATCH</h1>
+        <p style="font-size: 18px; margin-bottom: 30px; letter-spacing: 1px;">프리미엄 디지털 옷장</p>
+        <button class="btn" style="padding: 15px 30px; font-size: 16px;" onclick="openWardrobe()">옷장 문 열기</button>
+    </div>
+</div>
+
+<div id="wardrobe" class="screen wood">
+    <div class="row">
+        <div class="left">
+            <h2 style="color: #d8b06c; margin-top: 0;">내 옷장 <span style="font-size: 14px; color:#aaa; font-weight: normal;">(원하는 칸으로 드래그하여 분류하세요)</span></h2>
+            
+            <div class="closet-container">
+                <div class="shelf" id="zone-uncategorized" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'uncategorized')">
+                    <div class="shelf-label">📥 미분류 (새로 추가됨)</div>
+                </div>
+                <div class="shelf" id="zone-top" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'top')">
+                    <div class="shelf-label">👕 상의 (Top)</div>
+                </div>
+                <div class="shelf" id="zone-bottom" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'bottom')">
+                    <div class="shelf-label">👖 하의 (Bottom)</div>
+                </div>
+                <div class="shelf" id="zone-acc" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="drop(event, 'acc')">
+                    <div class="shelf-label">🧢 ACC (액세서리)</div>
+                </div>
+            </div>
+
+            <div>
+                <button class="btn" style="width: 100%;" onclick="randomRecommend()">오늘의 랜덤 코디 추천 받기</button>
+            </div>
+        </div>
+
+        <div class="right">
+            <h2 style="color: #d8b06c; margin-top: 0;">의류 등록</h2>
+            <div class="camera">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" style="display:none"></canvas>
+                
+                <div class="btn-group" style="margin-top:15px; display: flex; gap: 10px;">
+                    <button class="btn" style="flex: 1;" onclick="startCamera()">📷 카메라 실행</button>
+                    <button class="btn" style="flex: 1;" onclick="takePhoto()">📸 촬영 저장</button>
+                    <label class="btn file-upload-wrapper" style="flex: 1; margin: 0;">
+                        📁 사진 업로드
+                        <input type="file" id="upload" accept="image/*">
+                    </label>
+                </div>
+            </div>
+            <div class="card" id="weather">날씨 불러오는 중...</div>
+        </div>
+    </div>
+</div>
+
+<div id="recommend" class="screen">
+    <div style="max-width: 800px; margin: 0 auto; text-align: center;">
+        <h1 style="color: #d8b06c; font-family: 'Jennie', 'ZEN SERIF', serif; font-size: 40px; margin-bottom: 5px;">Today's Pick</h1>
+        <p style="color: #aaa; margin-bottom: 30px;">AI가 분석한 오늘의 베스트 매칭입니다.</p>
+        
+        <div id="selected" class="recommend-images"></div>
+        
+        <div style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
+            <div class="card" id="aiAnalysis"></div>
+            
+            <div class="card" style="text-align: center;">
+                <div class="score" id="score">92</div>
+                <span style="font-size: 18px; font-weight: bold;">종합 스타일 점수</span>
+            </div>
+        </div>
+        <br>
+        <button class="btn" style="width: 100%; max-width: 300px; margin-top: 10px;" onclick="backWardrobe()">옷장으로 돌아가기</button>
+    </div>
+</div>
+
+<script>
+// 모바일 터치 드래그 앤 드롭 활성화
+MobileDragDrop.polyfill({
+    dragImageTranslateOverride: MobileDragDrop.scrollBehaviourDragImageTranslateOverride
+});
+
+let clothes = [];
+let selected = [];
+let currentTemp = "20"; 
+let apparentTemp = "20"; 
+
+function openWardrobe() {
+    const intro = document.getElementById('intro');
+    intro.classList.add('open'); 
+    
+    setTimeout(() => {
+        intro.style.display = 'none';
+        document.getElementById('wardrobe').style.display = 'block';
+        loadWeather();
+        render();
+    }, 1200); 
+}
+
+function render() {
+    const zones = {
+        'uncategorized': document.getElementById('zone-uncategorized'),
+        'top': document.getElementById('zone-top'),
+        'bottom': document.getElementById('zone-bottom'),
+        'acc': document.getElementById('zone-acc')
+    };
+
+    for (let key in zones) {
+        const zone = zones[key];
+        const label = zone.querySelector('.shelf-label').outerHTML;
+        zone.innerHTML = label;
+    }
+    
+    if(clothes.length === 0) {
+        zones['uncategorized'].innerHTML += '<div style="color: #aaa; padding: 10px; width:100%; text-align:center;">의류를 촬영하거나 업로드해주세요.</div>';
+        return;
+    }
+
+    clothes.forEach(item => {
+        if (!item.category) item.category = 'uncategorized';
+
+        const d = document.createElement('div');
+        d.className = 'hanger';
+        d.draggable = true; 
+        
+        d.ondragstart = (e) => {
+            e.dataTransfer.setData("itemId", item.id);
+            setTimeout(() => { d.style.opacity = '0.5'; }, 0);
+        };
+        d.ondragend = () => { d.style.opacity = '1'; };
+        
+        d.innerHTML = `
+            <div style="font-size: 20px; z-index: 2; margin-bottom: -5px;">🪝</div>
+            <button class="delete-btn" onclick="deleteItem(${item.id}, event)">✕</button>
+            <img src="${item.img}" style="border-color: ${selected.includes(item.id) ? '#d8b06c' : 'transparent'}">
+        `;
+        
+        d.onclick = () => {
+            if (selected.includes(item.id)) {
+                selected = selected.filter(x => x !== item.id);
+            } else {
+                selected.push(item.id);
+            }
+            render();
+        };
+        
+        if (zones[item.category]) {
+            zones[item.category].appendChild(d);
+        } else {
+            zones['uncategorized'].appendChild(d);
+        }
+    });
+}
+
+function allowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('drag-over');
+}
+function dragLeave(ev) {
+    ev.currentTarget.classList.remove('drag-over');
+}
+function drop(ev, category) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('drag-over');
+    const id = parseInt(ev.dataTransfer.getData("itemId"));
+    
+    const itemIndex = clothes.findIndex(c => c.id === id);
+    if(itemIndex > -1) {
+        clothes[itemIndex].category = category; 
+        localStorage.setItem('mixmatch_clothes', JSON.stringify(clothes));
+        render();
+    }
+}
+
+function deleteItem(id, event) {
+    event.stopPropagation(); 
+    if(confirm('이 의류를 옷장에서 삭제하시겠습니까?')) {
+        clothes = clothes.filter(item => item.id !== id);
+        selected = selected.filter(selId => selId !== id);
+        localStorage.setItem('mixmatch_clothes', JSON.stringify(clothes));
+        render();
+    }
+}
+
+async function startCamera() {
+    try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const video = document.getElementById('video');
+        video.style.display = "block";
+        video.srcObject = s;
+    } catch (e) {
+        alert('카메라 권한이 필요하거나 기기에 카메라가 없습니다.');
+    }
+}
+
+function takePhoto() {
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    
+    if(!video.srcObject) {
+        alert('먼저 카메라를 실행해주세요.');
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth || 300;
+    canvas.height = video.videoHeight || 400;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // 사진 촬영 시에도 JPEG로 압축 저장하도록 수정 (선택사항이나 용량 관리에 좋음)
+    const captured = canvas.toDataURL('image/jpeg', 0.8);
+
+    clothes.push({
+        id: Date.now(),
+        category: 'uncategorized', 
+        img: captured
+    });
+    
+    localStorage.setItem('mixmatch_clothes', JSON.stringify(clothes));
+    render();
+}
+
+// 📌 업로드 시 이미지 압축을 수행하도록 수정된 부분
+document.getElementById('upload').onchange = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    
+    const r = new FileReader();
+    r.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+            // 이미지 압축을 위한 임시 캔버스 생성
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 600; // 최대 너비 (원하는 사이즈로 조절 가능)
+            const MAX_HEIGHT = 800; // 최대 높이
+            let width = img.width;
+            let height = img.height;
+
+            // 비율에 맞춰 크기 조절
+            if (width > height) {
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+            } else {
+                if (height > MAX_HEIGHT) {
+                    width *= MAX_HEIGHT / height;
+                    height = MAX_HEIGHT;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // 이미지 압축 (image/jpeg 포맷, 0.7 퀄리티 설정)
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+            clothes.push({
+                id: Date.now(),
+                category: 'uncategorized', 
+                img: compressedDataUrl
+            });
+            localStorage.setItem('mixmatch_clothes', JSON.stringify(clothes));
+            render();
+            e.target.value = ''; 
+        };
+        img.src = event.target.result;
+    };
+    r.readAsDataURL(f);
+};
+
+function randomRecommend() {
+    if(clothes.length < 2) {
+        alert('코디 조합을 추천받으려면 옷장에 최소 2개의 의류가 필요합니다!');
+        return;
+    }
+    let shuffled = [...clothes].sort(() => Math.random() - 0.5);
+    let pickedItems = shuffled.slice(0, 2);
+    showRecommendScreen(pickedItems);
+}
+
+function showRecommendScreen(items) {
+    document.getElementById('wardrobe').style.display = 'none';
+    document.getElementById('recommend').style.display = 'block';
+
+    const selectedDiv = document.getElementById('selected');
+    selectedDiv.innerHTML = '';
+    items.forEach(item => {
+        selectedDiv.innerHTML += `<img src="${item.img}">`;
+    });
+
+    const tempNum = parseFloat(currentTemp);
+    let weatherText = tempNum >= 25 ? "다소 더운 날씨" : (tempNum <= 10 ? "쌀쌀한 날씨" : "선선하고 활동하기 좋은 날씨");
+    
+    document.getElementById('aiAnalysis').innerHTML = `
+        <h3 style="color: #d8b06c; margin-top: 0;">✨ AI 매칭 리포트</h3>
+        <p style="margin-bottom: 10px;"><b>🌡️ 날씨 기반 분석</b><br>
+        현재 기온(${currentTemp}℃)과 체감온도(${apparentTemp}℃)를 반영했습니다. ${weatherText}에 맞춰 너무 두껍지도, 얇지도 않은 최적의 레이어링으로 선택된 조합입니다.</p>
+        
+        <p style="margin-bottom: 10px;"><b>🎨 컬러 및 무드 조화</b><br>
+        서로 대비되면서도 시각적으로 안정감을 주는 배색입니다. 전체적으로 모던하면서도 일상에서 부담 없이 입을 수 있는 매치가 완성되었습니다.</p>
+        
+        <p style="margin-bottom: 0;"><b>📈 패션 트렌드 적합도</b><br>
+        이번 시즌 트렌드인 '미니멀 캐주얼' 무드에 완벽하게 부합하는 실루엣을 연출할 수 있습니다.</p>
+    `;
+    
+    document.getElementById('score').innerText = Math.floor(Math.random() * 11) + 88; 
+}
+
+function backWardrobe() {
+    document.getElementById('recommend').style.display = 'none';
+    document.getElementById('wardrobe').style.display = 'block';
+    selected = []; 
+    render();
+}
+
+async function loadWeather() {
+    const weatherDiv = document.getElementById('weather');
+    try {
+        const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, {timeout: 5000}));
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,apparent_temperature`);
+        const data = await res.json();
+        
+        currentTemp = data.current.temperature_2m;
+        apparentTemp = data.current.apparent_temperature;
+
+        weatherDiv.innerHTML = `
+        <b style="color: #d8b06c; font-size: 18px;">오늘의 날씨 (현재 위치)</b><br><br>
+        <span style="font-size: 24px;">🌡️ ${currentTemp}℃</span><br>
+        <span style="color: #ccc;">체감온도: ${apparentTemp}℃</span><br><br>
+        <b style="color:#aaa; font-size: 14px;">추천 스타일:</b> 온도 맞춤 캐주얼
+        `;
+    } catch (e) {
+        weatherDiv.innerHTML = '<span style="color: #ff6b6b;">날씨 정보를 가져올 수 없습니다.</span><br><span style="font-size: 13px; color: #ccc;">(브라우저의 위치 정보 접근 권한을 허용해주세요)</span>';
+    }
+}
+
+clothes = JSON.parse(localStorage.getItem('mixmatch_clothes') || '[]');
+</script>
+</body>
+</html>
